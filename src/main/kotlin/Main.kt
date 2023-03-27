@@ -1,9 +1,10 @@
 package main
 
-import java.util.*
 import kotlinx.benchmark.*
 import kotlinx.html.*
+import kotlinx.html.stream.appendHTML
 import kotlinx.html.stream.createHTML
+import java.util.*
 
 // Domain class
 data class Product(val name: String, val price: Int)
@@ -22,7 +23,7 @@ class KotlinxHtmlBenchmark {
 
   @Benchmark
   fun renderWithProductComponent2(blackhole: Blackhole) {
-    withDivAndProducts(blackhole) { consumer.productComponent2(it) }
+    withAppendableAndProducts(blackhole) { productComponent2(it) }
   }
 
   @Benchmark
@@ -31,19 +32,34 @@ class KotlinxHtmlBenchmark {
   }
 
   final inline fun withDivAndProducts(
-      blackhole: Blackhole,
-      crossinline block: DIV.(Product) -> Unit
+    blackhole: Blackhole,
+    crossinline block: DIV.(Product) -> Unit
   ) =
-      blackhole.consume(
-          createHTML().div {
-            if (isSingleProductBenchmark) {
-              block(products.first())
-            } else {
-              for (product in products) {
-                block(product)
-              }
-            }
-          })
+    blackhole.consume(
+      createHTML().div {
+        if (isSingleProductBenchmark) {
+          block(products.first())
+        } else {
+          for (product in products) {
+            block(product)
+          }
+        }
+      })
+
+  final inline fun withAppendableAndProducts(
+    blackhole: Blackhole,
+    crossinline block: Appendable.(Product) -> Unit
+  ) =
+    blackhole.consume(
+      buildString {
+        if (isSingleProductBenchmark) {
+          block(products.first())
+        } else {
+          for (product in products) {
+            block(product)
+          }
+        }
+      })
 }
 
 // Render using returned lambda receiver
@@ -55,8 +71,8 @@ fun productComponent1(product: Product): FlowContent.() -> Unit = {
 }
 
 // Render using TagConsumer extension function
-fun TagConsumer<*>.productComponent2(product: Product) {
-  div {
+fun Appendable.productComponent2(product: Product) {
+  appendHTML().div {
     h5 { +product.name }
     div { +"$ ${product.price}" }
   }
